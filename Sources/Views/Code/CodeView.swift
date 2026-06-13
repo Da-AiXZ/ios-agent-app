@@ -49,8 +49,8 @@ struct CodeView: View {
                     DiffView(
                         chunks: viewModel.state.diffChunks,
                         originalContent: viewModel.state.originalContent,
-                        onAccept: { edit in
-                            viewModel.dispatch(.acceptEdit(oldString: edit.oldString, newString: edit.newString))
+                        onAccept: { oldStr, newStr in
+                            viewModel.dispatch(.acceptEdit(oldString: oldStr, newString: newStr))
                         },
                         onReject: {
                             viewModel.dispatch(.discardChanges)
@@ -139,10 +139,10 @@ struct CodeView: View {
             DiffView(
                 chunks: viewModel.state.diffChunks,
                 originalContent: viewModel.state.originalContent,
-                onAccept: { edit in
+                onAccept: { oldStr, newStr in
                     viewModel.dispatch(.acceptEdit(
-                        oldString: edit.oldString,
-                        newString: edit.newString
+                        oldString: oldStr,
+                        newString: newStr
                     ))
                 },
                 onReject: {
