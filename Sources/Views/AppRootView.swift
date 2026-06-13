@@ -88,8 +88,8 @@ struct AppRootView: View {
         let defaults = UserDefaults.standard
         let baseURL = defaults.string(forKey: "com.ios-agent-app.api-endpoint")
             ?? AppConstants.defaultAnthropicAPIEndpoint
-        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "anthropic"
-        let provider: APIProvider = (providerRaw == "openai") ? .openai : .anthropic
+        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "openai"
+        let provider: APIProvider = (providerRaw == "anthropic") ? .anthropic : .openai
 
         let apiClient = APIClient(apiKey: apiKey, baseURL: baseURL, provider: provider)
         let toolReg = ToolRegistry()
@@ -175,8 +175,8 @@ struct AppRootView: View {
         let defaults = UserDefaults.standard
         let baseURL = defaults.string(forKey: "com.ios-agent-app.api-endpoint")
             ?? AppConstants.defaultAnthropicAPIEndpoint
-        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "anthropic"
-        let provider: APIProvider = (providerRaw == "openai") ? .openai : .anthropic
+        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "openai"
+        let provider: APIProvider = (providerRaw == "anthropic") ? .anthropic : .openai
 
         let newClient = APIClient(apiKey: apiKey, baseURL: baseURL, provider: provider)
 
