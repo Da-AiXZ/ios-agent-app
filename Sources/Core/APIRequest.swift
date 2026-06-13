@@ -278,7 +278,9 @@ struct AgentRequest: Codable {
 
         switch provider {
         case .anthropic:
-            if baseURL.hasSuffix("/v1/messages") {
+            if baseURL.hasSuffix("#") {
+                endpoint = String(baseURL.dropLast())
+            } else if baseURL.hasSuffix("/v1/messages") {
                 endpoint = baseURL
             } else if baseURL.hasSuffix("/v1") {
                 endpoint = "\(baseURL)/messages"
@@ -287,7 +289,10 @@ struct AgentRequest: Codable {
             }
             modelField = "model"
         case .openai:
-            if baseURL.hasSuffix("/v1/chat/completions") {
+            if baseURL.hasSuffix("#") {
+                // '#' disables auto-completion for custom proxies.
+                endpoint = String(baseURL.dropLast())
+            } else if baseURL.hasSuffix("/v1/chat/completions") {
                 endpoint = baseURL
             } else if baseURL.hasSuffix("/v1") {
                 endpoint = "\(baseURL)/chat/completions"
