@@ -55,7 +55,7 @@ struct ChatView: View {
         .onReceive(viewModel.effects) { effect in
             handleEffect(effect)
         }
-        .onChange(of: viewModel.state.currentToolCalls) { calls in
+        .onReceive(viewModel.$state.map(\.currentToolCalls)) { calls in
             if let waiting = calls.first(where: { $0.status == .waitingPermission }) {
                 pendingPermissionTool = waiting
             }
@@ -68,7 +68,7 @@ struct ChatView: View {
     private var conversationHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.state.conversation?.title ?? "Chat")
+                Text(viewModel.state.conversation?.title ?? L10n.chat(lang: appState.language))
                     .font(.headline)
                     .foregroundColor(.primary)
                     .accessibilityLabel("Conversation: \(viewModel.state.conversation?.title ?? "Chat")")
@@ -77,11 +77,11 @@ struct ChatView: View {
                     HStack(spacing: 4) {
                         ProgressView()
                             .scaleEffect(0.6)
-                        Text("Generating...")
+                        Text(L10n.generating(lang: appState.language))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    .accessibilityLabel("Agent is generating a response")
+                    .accessibilityLabel(L10n.agentGenerating(lang: appState.language))
                 }
             }
 
@@ -92,7 +92,7 @@ struct ChatView: View {
                 Image(systemName: "square.and.pencil")
                     .font(.body)
             }
-            .accessibilityLabel("New conversation")
+            .accessibilityLabel(L10n.newConversation(lang: appState.language))
             .disabled(viewModel.state.isStreaming)
         }
         .padding(.horizontal, 16)
@@ -108,8 +108,8 @@ struct ChatView: View {
                     if viewModel.state.messages.isEmpty {
                         EmptyStateView(
                             icon: "bubble.left.and.bubble.right",
-                            title: "Start a Conversation",
-                            subtitle: "Ask the AI agent to help you write, debug, or understand code."
+                            title: L10n.startConversation(lang: appState.language),
+                            subtitle: L10n.startConversationSubtitle(lang: appState.language)
                         )
                         .padding(.top, 60)
                     }
@@ -136,7 +136,7 @@ struct ChatView: View {
                                 .padding(.vertical, 8)
                                 .background(Color(UIColor.secondarySystemBackground))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .accessibilityLabel("Streaming response")
+                                .accessibilityLabel(L10n.streamingResponse(lang: appState.language))
 
                             Spacer(minLength: 40)
                         }
@@ -179,11 +179,11 @@ struct ChatView: View {
                         .foregroundColor(.red)
                     Spacer()
                     Button(action: { viewModel.dispatch(.retryLastMessage) }) {
-                        Text("Retry")
+                        Text(L10n.retry(lang: appState.language))
                             .font(.caption)
                             .fontWeight(.medium)
                     }
-                    .accessibilityLabel("Retry last message")
+                    .accessibilityLabel(L10n.retry(lang: appState.language))
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -193,7 +193,7 @@ struct ChatView: View {
             }
 
             HStack(alignment: .bottom, spacing: 8) {
-                TextField("Ask anything...", text: Binding(
+                TextField(L10n.askAnything(lang: appState.language), text: Binding(
                     get: { viewModel.state.inputText },
                     set: { viewModel.dispatch(.updateInputText($0)) }
                 ), axis: .vertical)
@@ -203,7 +203,7 @@ struct ChatView: View {
                 .background(Color(UIColor.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .lineLimit(1...6)
-                .accessibilityLabel("Message input")
+                .accessibilityLabel(L10n.messageInput(lang: appState.language))
                 .disabled(viewModel.state.isStreaming)
                 .onSubmit {
                     viewModel.dispatch(.sendMessage(viewModel.state.inputText))
@@ -215,7 +215,7 @@ struct ChatView: View {
                             .font(.title2)
                             .foregroundColor(.red)
                     }
-                    .accessibilityLabel("Stop generation")
+                    .accessibilityLabel(L10n.stopGeneration(lang: appState.language))
                 } else {
                     Button(action: {
                         viewModel.dispatch(.sendMessage(viewModel.state.inputText))
@@ -224,7 +224,7 @@ struct ChatView: View {
                             .font(.title2)
                             .foregroundColor(viewModel.state.canSend ? .accentColor : .secondary)
                     }
-                    .accessibilityLabel("Send message")
+                    .accessibilityLabel(L10n.sendMessage(lang: appState.language))
                     .disabled(!viewModel.state.canSend)
                 }
             }
@@ -246,5 +246,47 @@ struct ChatView: View {
         case .showToolApproval(let tool):
             pendingPermissionTool = tool
         }
+    }
+}
+
+// MARK: - L10n Helpers
+
+/// Convenience wrapper for localizing ChatView strings.
+private enum L10n {
+    static func chat(lang: AppLanguage) -> String {
+        LocalizedString.get("chat", lang: lang)
+    }
+    static func startConversation(lang: AppLanguage) -> String {
+        LocalizedString.get("start_conversation", lang: lang)
+    }
+    static func startConversationSubtitle(lang: AppLanguage) -> String {
+        LocalizedString.get("start_conversation_subtitle", lang: lang)
+    }
+    static func generating(lang: AppLanguage) -> String {
+        LocalizedString.get("generating", lang: lang)
+    }
+    static func askAnything(lang: AppLanguage) -> String {
+        LocalizedString.get("ask_anything", lang: lang)
+    }
+    static func retry(lang: AppLanguage) -> String {
+        LocalizedString.get("retry", lang: lang)
+    }
+    static func newConversation(lang: AppLanguage) -> String {
+        LocalizedString.get("new_conversation", lang: lang)
+    }
+    static func sendMessage(lang: AppLanguage) -> String {
+        LocalizedString.get("send_message", lang: lang)
+    }
+    static func stopGeneration(lang: AppLanguage) -> String {
+        LocalizedString.get("stop_generation", lang: lang)
+    }
+    static func messageInput(lang: AppLanguage) -> String {
+        LocalizedString.get("message_input", lang: lang)
+    }
+    static func agentGenerating(lang: AppLanguage) -> String {
+        LocalizedString.get("agent_generating", lang: lang)
+    }
+    static func streamingResponse(lang: AppLanguage) -> String {
+        LocalizedString.get("streaming_response", lang: lang)
     }
 }
