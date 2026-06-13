@@ -239,7 +239,7 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _ in
-            // Completion — handled in individual events.
+            // Completion 鈥?handled in individual events.
         } receiveValue: { [weak self] event in
             self?.processAgentEvent(event, accumulatedText: &accumulatedText)
         }
