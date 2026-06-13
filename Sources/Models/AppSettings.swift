@@ -47,12 +47,6 @@ struct AppSettings: Codable {
     /// The default AI model identifier used for new conversations.
     var defaultModelId: String
 
-    /// The OpenAI API key for GPT model access.
-    var openAIAPIKey: String
-
-    /// The Anthropic API key for Claude model access.
-    var anthropicAPIKey: String
-
     /// The base URL for OpenAI-compatible API endpoints.
     /// Allows use of proxies or self-hosted endpoints.
     var openAIBaseURL: String
@@ -71,8 +65,6 @@ struct AppSettings: Codable {
         theme: AppTheme = .system,
         language: AppLanguage = .english,
         defaultModelId: String = AppConstants.defaultModelId,
-        openAIAPIKey: String = "",
-        anthropicAPIKey: String = "",
         openAIBaseURL: String = AppConstants.defaultOpenAIBaseURL,
         planModeEnabled: Bool = true,
         trustedPaths: [String] = []
@@ -80,8 +72,6 @@ struct AppSettings: Codable {
         self.theme = theme
         self.language = language
         self.defaultModelId = defaultModelId
-        self.openAIAPIKey = openAIAPIKey
-        self.anthropicAPIKey = anthropicAPIKey
         self.openAIBaseURL = openAIBaseURL
         self.planModeEnabled = planModeEnabled
         self.trustedPaths = trustedPaths
