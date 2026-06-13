@@ -48,3 +48,4 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: NO
         ENABLE_BITCODE: NO
+        OTHER_SWIFT_FLAGS: "$(inherited) -strict-concurrency=minimal"
