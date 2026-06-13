@@ -49,20 +49,6 @@ enum SSEEventType: String, CaseIterable {
     case ping
 }
 
-// MARK: - SSEParserError
-
-/// Errors specific to SSE parsing.
-enum SSEParserError: LocalizedError {
-    case bufferOverflow
-
-    var errorDescription: String? {
-        switch self {
-        case .bufferOverflow:
-            return "SSE buffer exceeded maximum size."
-        }
-    }
-}
-
 // MARK: - SSEParser
 
 /// A state-machine based parser for Server-Sent Events (SSE).
@@ -112,23 +98,19 @@ final class SSEParser {
     /// entering error state on a single split multi-byte character.
     private var consecutiveDecodeFailures: Int
 
-    /// Maximum buffer size in bytes to prevent OOM from malicious servers.
-    private let maxBufferSize: Int
-
     /// Continuation for the AsyncStream output.
     private var continuation: AsyncThrowingStream<SSEEvent, Error>.Continuation?
 
     // MARK: - Initialization
 
     /// Creates a new SSE parser in the idle state.
-    init(maxBufferSize: Int = 10 * 1024 * 1024) {
+    init() {
         self.buffer = Data()
         self.state = .idle
         self.currentEventType = nil
         self.currentEventId = nil
         self.currentDataBuffer = ""
         self.consecutiveDecodeFailures = 0
-        self.maxBufferSize = maxBufferSize
     }
 
     // MARK: - Public Methods
@@ -146,15 +128,6 @@ final class SSEParser {
         AsyncThrowingStream<SSEEvent, Error> { continuation in
             self.continuation = continuation
             buffer.append(bytes)
-            
-            // Guard against OOM from malicious servers.
-            if buffer.count > maxBufferSize {
-                state = .error
-                emitError("SSE buffer exceeded max size (\(maxBufferSize) bytes)")
-                continuation.finish(throwing: SSEParserError.bufferOverflow)
-                return
-            }
-            
             parseBuffer()
 
             // If the stream ended, signal completion.
