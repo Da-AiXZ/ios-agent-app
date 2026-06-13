@@ -140,5 +140,4 @@ final class ToolRegistry: ToolRegistryProtocol {
             return results.map { $0.1 }
         }
     }
-    }
 }
