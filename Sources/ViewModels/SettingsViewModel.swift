@@ -356,8 +356,8 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
 
     /// Masks an API key for secure display, showing only the last 4 characters.
     private func maskAPIKey(_ key: String) -> String {
-        guard key.count > 4 else { return String(repeating: "•", count: key.count) }
-        let prefix = String(repeating: "•", count: min(12, key.count - 4))
+        guard key.count > 4 else { return String(repeating: "鈥?, count: key.count) }
+        let prefix = String(repeating: "鈥?, count: min(12, key.count - 4))
         let suffix = String(key.suffix(4))
         return prefix + suffix
     }
