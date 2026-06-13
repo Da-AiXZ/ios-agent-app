@@ -296,10 +296,10 @@ struct AgentRequest: Codable {
 
         // Headers
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("\(apiKey)", forHTTPHeaderField: "x-api-key")
 
         switch provider {
         case .anthropic:
+            request.setValue("\(apiKey)", forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         case .openai:
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -347,9 +347,15 @@ struct AgentRequest: Codable {
             case .anthropic:
                 bodyDict["system"] = systemPrompt
             case .openai:
-                // For OpenAI, inject as first message
-                // Already handled by message array
-                break
+                // For OpenAI, inject as a system-role message at the front.
+                let systemMessage: [String: Any] = [
+                    "role": "system",
+                    "content": systemPrompt
+                ]
+                if var msgs = bodyDict["messages"] as? [[String: Any]] {
+                    msgs.insert(systemMessage, at: 0)
+                    bodyDict["messages"] = msgs
+                }
             }
         }
 
