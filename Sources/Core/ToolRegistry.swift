@@ -108,49 +108,37 @@ final class ToolRegistry: ToolRegistryProtocol {
     ) async -> [ToolResult] {
         Logger.agentInfo("Executing \(calls.count) tools in parallel")
 
-        var allResults: [(Int, ToolResult)] = []
-        let batchSize = 8  // Prevent resource exhaustion from excessive tool calls.
-
-        for batchStart in stride(from: 0, to: calls.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, calls.count)
-            let batch = Array(calls[batchStart..<batchEnd])
-
-            let batchResults = await withTaskGroup(of: (Int, ToolResult).self) { group in
-                for (offset, call) in batch.enumerated() {
-                    let index = batchStart + offset
-                    group.addTask {
-                        let result: ToolResult
-                        do {
-                            result = try await self.executeTool(
-                                id: call.id,
-                                name: call.name,
-                                arguments: call.arguments
-                            )
-                        } catch {
-                            result = ToolResult(
-                                toolCallId: call.id,
-                                toolName: call.name,
-                                status: .error,
-                                output: "",
-                                errorMessage: error.localizedDescription,
-                                durationMs: 0
-                            )
-                        }
-                        return (index, result)
+        return await withTaskGroup(of: (Int, ToolResult).self) { group in
+            for (index, call) in calls.enumerated() {
+                group.addTask {
+                    let result: ToolResult
+                    do {
+                        result = try await self.executeTool(
+                            id: call.id,
+                            name: call.name,
+                            arguments: call.arguments
+                        )
+                    } catch {
+                        result = ToolResult(
+                            toolCallId: call.id,
+                            toolName: call.name,
+                            status: .error,
+                            output: "",
+                            errorMessage: error.localizedDescription,
+                            durationMs: 0
+                        )
                     }
+                    return (index, result)
                 }
-
-                var results: [(Int, ToolResult)] = []
-                for await pair in group {
-                    results.append(pair)
-                }
-                return results
             }
-            allResults.append(contentsOf: batchResults)
-        }
 
-        allResults.sort { $0.0 < $1.0 }
-        return allResults.map { $0.1 }
+            var results: [(Int, ToolResult)] = []
+            for await pair in group {
+                results.append(pair)
+            }
+            results.sort { $0.0 < $1.0 }
+            return results.map { $0.1 }
+        }
     }
     }
 }
