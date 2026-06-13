@@ -224,7 +224,7 @@ struct AgentRequest: Codable {
     /// Maximum number of tokens in the response.
     let maxTokens: Int
 
-    /// Sampling temperature (0.0–2.0). Lower values are more deterministic.
+    /// Sampling temperature (0.0鈥?.0). Lower values are more deterministic.
     let temperature: Double
 
     /// System prompt that sets the assistant's behavior.
