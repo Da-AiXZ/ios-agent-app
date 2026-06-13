@@ -127,7 +127,7 @@ struct ChatView: View {
                     // Streaming text indicator.
                     if viewModel.state.isStreaming && !viewModel.state.streamingText.isEmpty {
                         HStack(alignment: .top, spacing: 8) {
-                            Text("🤖")
+                            Text("馃")
                                 .font(.title3)
                                 .accessibilityHidden(true)
 
