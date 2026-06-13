@@ -278,10 +278,24 @@ struct AgentRequest: Codable {
 
         switch provider {
         case .anthropic:
-            endpoint = "\(baseURL)/v1/messages"
+            if baseURL.hasSuffix("/v1/messages") {
+                endpoint = baseURL
+            } else if baseURL.hasSuffix("/v1") {
+                endpoint = "\(baseURL)/messages"
+            } else {
+                endpoint = "\(baseURL)/v1/messages"
+            }
             modelField = "model"
         case .openai:
-            endpoint = "\(baseURL)/v1/chat/completions"
+            if baseURL.hasSuffix("/v1/chat/completions") {
+                endpoint = baseURL
+            } else if baseURL.hasSuffix("/v1") {
+                endpoint = "\(baseURL)/chat/completions"
+            } else if baseURL.hasSuffix("/chat/completions") {
+                endpoint = baseURL
+            } else {
+                endpoint = "\(baseURL)/v1/chat/completions"
+            }
             modelField = "model"
         }
 
