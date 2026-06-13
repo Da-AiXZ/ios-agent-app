@@ -42,5 +42,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs network access to communicate with AI APIs.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to documents to read and edit your project files.</string>
 </dict>
 </plist>
