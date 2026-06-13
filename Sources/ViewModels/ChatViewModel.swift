@@ -302,12 +302,7 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
         updated.currentToolCalls[index].status = .executing
         state = updated
 
-        // Resolve the permission request.
-        if let pending = permissionManager as? PermissionManager,
-           let request = pending.pendingRequest,
-           request.toolCallId == callId {
-            request.onApprove()
-        }
+        permissionManager.approveRequest(toolCallId: callId)
     }
 
     /// Denies a tool call that is waiting for user permission.
@@ -319,12 +314,7 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
         updated.currentToolCalls[index].status = .denied
         state = updated
 
-        // Resolve the permission request.
-        if let pending = permissionManager as? PermissionManager,
-           let request = pending.pendingRequest,
-           request.toolCallId == callId {
-            request.onDeny()
-        }
+        permissionManager.denyRequest(toolCallId: callId)
     }
 
     /// Loads a conversation from history into the UI.
