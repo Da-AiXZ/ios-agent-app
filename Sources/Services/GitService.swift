@@ -113,6 +113,7 @@ enum GitServiceError: LocalizedError {
     case gitNotFound
     case executionFailed(command: String, stderr: String)
     case timeout
+    case notAvailableOnIOS
 
     var errorDescription: String? {
         switch self {
@@ -124,6 +125,8 @@ enum GitServiceError: LocalizedError {
             return "Git command failed: \(cmd)\n\(stderr)"
         case .timeout:
             return "Git operation timed out."
+        case .notAvailableOnIOS:
+            return "Git operations are not available on iOS."
         }
     }
 }
@@ -292,43 +295,7 @@ final class GitService: GitServiceProtocol {
         arguments: [String],
         cwd: URL
     ) throws -> TerminalResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: gitPath)
-        process.arguments = arguments
-        process.currentDirectoryURL = cwd
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-        } catch {
-            throw GitServiceError.gitNotFound
-        }
-
-        process.waitUntilExit()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-
-        if process.terminationStatus != 0 {
-            throw GitServiceError.executionFailed(
-                command: arguments.joined(separator: " "),
-                stderr: stderr
-            )
-        }
-
-        return TerminalResult(
-            exitCode: process.terminationStatus,
-            stdout: stdout,
-            stderr: stderr,
-            durationMs: 0
-        )
+        throw GitServiceError.notAvailableOnIOS
     }
 
     /// Naive parsing of unified diff output into DiffChunk structures.
