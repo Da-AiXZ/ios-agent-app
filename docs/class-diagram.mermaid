@@ -1,0 +1,452 @@
+classDiagram
+    direction TB
+
+    %% ── Models ──
+    class Conversation {
+        +String id
+        +String title
+        +[Message] messages
+        +Date createdAt
+        +Date updatedAt
+        +String modelId
+        +String systemPrompt
+        +Bool isArchived
+    }
+
+    class Message {
+        +String id
+        +MessageRole role
+        +String content
+        +[ToolCall] toolCalls
+        +String toolCallId
+        +Date timestamp
+        +TokenUsage tokenUsage
+    }
+
+    class Project {
+        +String id
+        +String name
+        +URL rootURL
+        +String claudeMDContent
+        +[String] gitignorePatterns
+        +Date lastOpened
+    }
+
+    class FileItem {
+        +String id
+        +String name
+        +URL url
+        +Bool isDirectory
+        +[FileItem] children
+        +Int64 fileSize
+        +Date modificationDate
+    }
+
+    class ToolResult {
+        +String toolCallId
+        +String toolName
+        +ToolResultStatus status
+        +String output
+        +String errorMessage
+        +Date executedAt
+        +Int durationMs
+    }
+
+    class DiffChunk {
+        +String id
+        +DiffChunkType type
+        +[DiffLine] lines
+        +Int oldStartLine
+        +Int newStartLine
+    }
+
+    class DiffLine {
+        +String content
+        +DiffLineType type
+        +Int oldLineNumber
+        +Int newLineNumber
+    }
+
+    class AppSettings {
+        +AppTheme theme
+        +AppLanguage language
+        +String defaultModelId
+        +String openAIAPIKey
+        +String anthropicAPIKey
+        +String openAIBaseURL
+        +Bool planModeEnabled
+        +[String] trustedPaths
+    }
+
+    class UserPreferences {
+        +Bool autoApproveReadOnly
+        +Bool showLineNumbers
+        +Int fontSize
+        +String fontFamily
+        +Bool wordWrap
+    }
+
+    %% ── Core: Agent ──
+    class AgentRuntime {
+        -APIClient apiClient
+        -ToolRegistry toolRegistry
+        -PermissionManager permissionMgr
+        -ConversationManager conversationMgr
+        +runTask(message, modelId) AsyncStream~AgentEvent~
+        +cancelCurrentTask()
+        +executeTools(toolCalls) [ToolResult]
+    }
+
+    class AgentTask {
+        +String id
+        +AgentTaskStatus status
+        +Conversation conversation
+        +[ToolCall] pendingToolCalls
+        +[ToolResult] toolResults
+        +Date startedAt
+        +cancel()
+    }
+
+    class ToolCall {
+        +String id
+        +String name
+        +[String: AnyCodable] arguments
+        +String callId
+    }
+
+    class AgentMessage {
+        +String id
+        +AgentMessageRole role
+        +String content
+        +[ToolCall] toolCalls
+        +String finishReason
+    }
+
+    %% ── Core: API ──
+    class APIClient {
+        -URLSession session
+        -SSEParser parser
+        +sendStreamRequest(request) AsyncStream~SSEEvent~
+        +sendRequest(request) AnyPublisher~Data, Error~
+        +cancelAllRequests()
+    }
+
+    class SSEParser {
+        -Data buffer
+        +parse(bytes) [SSEEvent]
+        +reset()
+    }
+
+    class APIRequest {
+        +String model
+        +[APIMessage] messages
+        +[ToolDefinition] tools
+        +Bool stream
+        +Int maxTokens
+        +Double temperature
+        +String systemPrompt
+        -toURLRequest(apiKey, baseURL) URLRequest
+    }
+
+    class APIModels {
+        +ChatCompletionResponse
+        +ChatCompletionChoice
+        +ChatCompletionDelta
+        +ToolDefinition
+        +FunctionDefinition
+    }
+
+    %% ── Core: Tools ──
+    class ToolProtocol {
+        <<protocol>>
+        +String name
+        +String description
+        +JSONSchema parameters
+        +Bool requiresApproval
+        +PermissionScope permissionScope
+        +execute(arguments) ToolResult
+        +toolDefinition() ToolDefinition
+    }
+
+    class ToolRegistry {
+        -[String: ToolProtocol] tools
+        +register(tool)
+        +unregister(name)
+        +getTool(name) ToolProtocol?
+        +allToolDefinitions() [ToolDefinition]
+        +executeTool(name, arguments) ToolResult
+    }
+
+    class ReadFileTool {
+        -FileSystemService fs
+        +execute(arguments) ToolResult
+    }
+
+    class WriteFileTool {
+        -FileSystemService fs
+        +execute(arguments) ToolResult
+    }
+
+    class EditFileTool {
+        -FileSystemService fs
+        -DiffEngine diffEngine
+        +execute(arguments) ToolResult
+    }
+
+    class ShellTool {
+        -TerminalService terminal
+        +execute(arguments) ToolResult
+    }
+
+    class GlobTool {
+        -SearchService search
+        +execute(arguments) ToolResult
+    }
+
+    class GrepTool {
+        -SearchService search
+        +execute(arguments) ToolResult
+    }
+
+    class FileTreeTool {
+        -FileSystemService fs
+        +execute(arguments) ToolResult
+    }
+
+    class GitStatusTool {
+        -GitService git
+        +execute(arguments) ToolResult
+    }
+
+    class GitCommitTool {
+        -GitService git
+        +execute(arguments) ToolResult
+    }
+
+    class GitDiffTool {
+        -GitService git
+        +execute(arguments) ToolResult
+    }
+
+    %% ── Core: Permissions ──
+    class PermissionManager {
+        -[String: PermissionRule] rules
+        +requestPermission(scope, description) Bool
+        +isAllowed(scope) Bool
+        +grantTemporary(scope, duration)
+        +revokeAll()
+    }
+
+    class PermissionScope {
+        <<enum>>
+        readFile
+        writeFile
+        deleteFile
+        executeShell
+        gitRead
+        gitWrite
+        networkOutbound
+    }
+
+    %% ── Services ──
+    class FileSystemService {
+        -FileManager fileManager
+        +readFile(at) String
+        +writeFile(at, content)
+        +createDirectory(at)
+        +deleteItem(at)
+        +listDirectory(at) [FileItem]
+        +fileExists(at) Bool
+        +isTextFile(at) Bool
+    }
+
+    class GitService {
+        -URL repositoryURL
+        +status() GitStatus
+        +diff(staged, file) String
+        +commit(message, files) CommitResult
+        +branches() [GitBranch]
+        +currentBranch() String
+        +log(count) [GitLogEntry]
+    }
+
+    class TerminalService {
+        -Process currentProcess
+        +execute(command, cwd) AsyncStream~TerminalOutput~
+        +terminate()
+        +isRunning() Bool
+    }
+
+    class SyntaxHighlightService {
+        -[String: Highlighter] highlighters
+        +highlight(code, language) NSAttributedString
+        +registerLanguage(name, grammar)
+        +supportedLanguages() [String]
+    }
+
+    class DiffEngine {
+        +computeDiff(old, new) [DiffChunk]
+        +applyPatch(original, chunks) String
+        +unifiedDiff(old, new, contextLines) String
+    }
+
+    class SearchService {
+        -FileSystemService fs
+        +glob(pattern, root) [URL]
+        +grep(pattern, root, fileTypes) [GrepMatch]
+        +searchInFile(url, pattern) [GrepMatch]
+    }
+
+    %% ── ViewModels ──
+    class ChatViewModel {
+        -AgentRuntime agent
+        -ConversationManager convMgr
+        @Published [Message] messages
+        @Published String inputText
+        @Published Bool isStreaming
+        @Published String streamingText
+        +sendMessage()
+        +cancelStreaming()
+        +loadConversation(id)
+        +newConversation()
+    }
+
+    class ConversationManager {
+        -[Conversation] conversations
+        +createConversation(modelId, systemPrompt) Conversation
+        +getConversation(id) Conversation?
+        +listConversations() [Conversation]
+        +deleteConversation(id)
+        +archiveConversation(id)
+        +saveConversation(conversation)
+    }
+
+    class EditorViewModel {
+        -FileSystemService fs
+        @Published String fileContent
+        @Published URL? currentFileURL
+        @Published Bool isModified
+        @Published String language
+        @Published NSAttributedString highlightedContent
+        +openFile(url)
+        +saveFile()
+        +edit(range, newText)
+        +undo()
+        +redo()
+    }
+
+    class FileTreeViewModel {
+        -FileSystemService fs
+        -SearchService search
+        @Published [FileItem] rootItems
+        @Published String searchQuery
+        @Published [URL] searchResults
+        +loadDirectory(url)
+        +refresh()
+        +globSearch(pattern)
+        +grepSearch(pattern, fileTypes)
+        +createFile(name, parent)
+        +createDirectory(name, parent)
+        +deleteItem(url)
+    }
+
+    class ToolCallViewModel {
+        @Published [ToolCallState] activeTools
+        +onToolCallStarted(call)
+        +onToolCallCompleted(result)
+        +onToolCallFailed(call, error)
+        +approveTool(callId)
+        +rejectTool(callId)
+    }
+
+    class TerminalViewModel {
+        -TerminalService terminal
+        @Published [String] outputLines
+        @Published Bool isRunning
+        @Published String currentCommand
+        +executeCommand(cmd)
+        +terminate()
+    }
+
+    class ProjectViewModel {
+        @Published [Project] projects
+        @Published Project? currentProject
+        +openProject(url)
+        +switchProject(id)
+        +loadCLAUDE MD(url)
+        +saveCLAUDE MD(content)
+        +closeProject()
+    }
+
+    class DiffViewModel {
+        -DiffEngine diffEngine
+        @Published [DiffChunk] chunks
+        @Published DiffViewMode mode
+        +computeDiff(old, new)
+        +acceptChunk(id)
+        +rejectChunk(id)
+        +acceptAll()
+        +rejectAll()
+    }
+
+    class SettingsViewModel {
+        @Published AppSettings settings
+        @Published UserPreferences preferences
+        +updateTheme(theme)
+        +updateLanguage(language)
+        +updateAPIKey(provider, key)
+        +updateModel(modelId)
+        +saveSettings()
+    }
+
+    %% ── Relationships ──
+    Conversation "1" --> "*" Message : contains
+    Message "1" --> "*" ToolCall : has
+    Conversation "1" --> "*" ToolResult : has
+    Project "1" --> "*" FileItem : root directory
+    DiffChunk "1" --> "*" DiffLine : contains
+    AppSettings "1" --> "1" UserPreferences : contains
+
+    AgentRuntime --> APIClient : uses
+    AgentRuntime --> ToolRegistry : uses
+    AgentRuntime --> PermissionManager : uses
+    AgentRuntime --> ConversationManager : uses
+    AgentRuntime ..> AgentTask : creates
+
+    ToolRegistry --> ToolProtocol : registers
+    ReadFileTool ..|> ToolProtocol
+    WriteFileTool ..|> ToolProtocol
+    EditFileTool ..|> ToolProtocol
+    ShellTool ..|> ToolProtocol
+    GlobTool ..|> ToolProtocol
+    GrepTool ..|> ToolProtocol
+    FileTreeTool ..|> ToolProtocol
+    GitStatusTool ..|> ToolProtocol
+    GitCommitTool ..|> ToolProtocol
+    GitDiffTool ..|> ToolProtocol
+
+    ReadFileTool --> FileSystemService
+    WriteFileTool --> FileSystemService
+    EditFileTool --> FileSystemService
+    EditFileTool --> DiffEngine
+    ShellTool --> TerminalService
+    GlobTool --> SearchService
+    GrepTool --> SearchService
+    FileTreeTool --> FileSystemService
+    GitStatusTool --> GitService
+    GitCommitTool --> GitService
+    GitDiffTool --> GitService
+
+    ChatViewModel --> AgentRuntime
+    ChatViewModel --> ConversationManager
+    EditorViewModel --> FileSystemService
+    EditorViewModel --> SyntaxHighlightService
+    FileTreeViewModel --> FileSystemService
+    FileTreeViewModel --> SearchService
+    ToolCallViewModel --> AgentRuntime
+    TerminalViewModel --> TerminalService
+    ProjectViewModel --> FileSystemService
+    ProjectViewModel --> GitService
+    DiffViewModel --> DiffEngine
+    SettingsViewModel --> AppSettings
+    SettingsViewModel --> UserPreferences

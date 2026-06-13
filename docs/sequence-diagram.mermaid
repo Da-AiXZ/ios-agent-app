@@ -1,0 +1,92 @@
+sequenceDiagram
+    actor User
+    participant ChatView as ChatView (SwiftUI)
+    participant ChatVM as ChatViewModel
+    participant ConvMgr as ConversationManager
+    participant Agent as AgentRuntime
+    participant API as APIClient
+    participant SSE as SSEParser
+    participant LLM as LLM API (OpenAI/Anthropic)
+    participant PermMgr as PermissionManager
+    participant ToolReg as ToolRegistry
+    participant Tool as ReadFileTool/ShellTool/...
+    participant FSSvc as FileSystemService
+    participant TermSvc as TerminalService
+
+    Note over User, TermSvc: === Phase 1: 用户发送消息 ===
+    User->>ChatView: 输入 "读取 main.swift 并修复编译错误"
+    ChatView->>ChatVM: sendMessage(text)
+    ChatVM->>ChatVM: 创建 UserMessage, 添加到 messages
+    ChatVM->>ConvMgr: appendMessage(conversationId, message)
+    ChatVM->>Agent: runTask(message, modelId)
+    ChatVM->>ChatVM: isStreaming = true
+
+    Note over Agent, LLM: === Phase 2: 首次 API 请求（流式）===
+    Agent->>API: sendStreamRequest(request with tools)
+    API->>LLM: POST /v1/chat/completions (SSE, stream: true)
+    LLM-->>API: HTTP 200 + SSE stream
+
+    loop SSE 流式解析
+        API-->>SSE: bytes received
+        SSE-->>SSE: 解析 data: [JSON] 行
+        SSE-->>Agent: SSEEvent.content(delta)
+        Agent-->>ChatVM: AgentEvent.streaming(text)
+        ChatVM-->>ChatView: 更新 streamingText, 打字效果
+    end
+
+    SSE-->>Agent: SSEEvent.toolCall(toolCall)
+    Agent->>Agent: 收集完整 tool_calls
+
+    Note over Agent, TermSvc: === Phase 3: 工具调用决策 ===
+    Agent->>Agent: 检测到 tool_calls in response
+    Agent->>ToolReg: allToolDefinitions() → 注入到下次请求
+    Agent->>ChatVM: AgentEvent.toolCallsDetected([ToolCall])
+    ChatVM->>ChatVM: 显示工具调用卡片
+
+    Note over Agent, TermSvc: === Phase 4: 并行工具执行 ===
+    par 并行执行（最多 N 个工具）
+        Agent->>PermMgr: requestPermission(writeFile, "修改 main.swift")
+        PermMgr-->>Agent: approved
+        Agent->>ToolReg: executeTool("write_file", {path, content})
+        ToolReg->>Tool: execute(arguments)
+        Tool->>FSSvc: writeFile(at, content)
+        FSSvc-->>Tool: success
+        Tool-->>ToolReg: ToolResult(status: success)
+    and
+        Agent->>PermMgr: requestPermission(executeShell, "swift build")
+        PermMgr-->>Agent: approved
+        Agent->>ToolReg: executeTool("shell", {command: "swift build"})
+        ToolReg->>Tool: execute(arguments)
+        Tool->>TermSvc: execute("swift build", cwd)
+        TermSvc-->>Tool: stream: "Build failed: error at line 42..."
+        Tool-->>ToolReg: ToolResult(status: success, output: "...")
+    end
+
+    ToolReg-->>Agent: [ToolResult, ToolResult]
+    Agent->>ChatVM: AgentEvent.toolResults([ToolResult])
+    ChatVM->>ChatVM: 更新工具卡片状态
+
+    Note over Agent, LLM: === Phase 5: 二次 API 请求（带工具结果）===
+    Agent->>API: sendStreamRequest(with tool results)
+    API->>LLM: POST (messages + tool results, stream: true)
+
+    loop SSE 流式解析（第二轮）
+        LLM-->>SSE: ...streaming...
+        SSE-->>Agent: SSEEvent.content(delta)
+        Agent-->>ChatVM: AgentEvent.streaming(text)
+    end
+
+    SSE-->>Agent: SSEEvent.finish("stop")
+    Agent->>ChatVM: AgentEvent.finished(finalMessage)
+    ChatVM->>ConvMgr: appendMessage(conversationId, assistantMessage)
+    ChatVM->>ChatVM: isStreaming = false
+    ChatView-->>User: 显示完整 AI 响应
+
+    Note over User, TermSvc: === Phase 6: 用户审批（Plan Mode）===
+    opt Plan Mode 开启 (G1)
+        Agent->>ChatVM: AgentEvent.planProposed([actions])
+        ChatVM->>ChatView: 显示审批卡片 (G2)
+        User->>ChatView: 点击 Approve / Reject
+        ChatView->>ChatVM: approvePlan() / rejectPlan()
+        ChatVM->>Agent: continueWithApproval() / cancelTask()
+    end
