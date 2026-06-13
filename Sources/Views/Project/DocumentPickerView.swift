@@ -6,7 +6,8 @@ import UniformTypeIdentifiers
 ///
 /// Uses `UIViewControllerRepresentable` to present the native iOS
 /// folder picker (`.folder` content type). The selected URL is
-/// returned through a callback closure.
+/// returned through a callback closure. A security-scoped bookmark
+/// is created for persistent access.
 struct DocumentPickerView: UIViewControllerRepresentable {
 
     /// Called with the selected folder URL.
@@ -39,6 +40,8 @@ struct DocumentPickerView: UIViewControllerRepresentable {
 
         let onPick: (URL) -> Void
         let onDismiss: (() -> Void)?
+        /// Keep the security-scoped URL alive until processed.
+        private var retainedURL: URL?
 
         init(onPick: @escaping (URL) -> Void, onDismiss: (() -> Void)?) {
             self.onPick = onPick
@@ -48,9 +51,12 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
 
-            // Start accessing security-scoped resource and keep it alive
-            // until the caller processes the URL (don't stop in defer).
-            _ = url.startAccessingSecurityScopedResource()
+            // Start accessing and keep reference alive.
+            let ok = url.startAccessingSecurityScopedResource()
+            if !ok {
+                Logger.error("Failed to access security-scoped resource: \(url.path)")
+            }
+            self.retainedURL = url
 
             // Create a bookmark for persistent access across app launches.
             if let bookmarkData = try? url.bookmarkData(
@@ -58,7 +64,6 @@ struct DocumentPickerView: UIViewControllerRepresentable {
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             ) {
-                // Store bookmark for future use.
                 UserDefaults.standard.set(bookmarkData, forKey: "com.ios-agent-app.last-bookmark")
             }
 
