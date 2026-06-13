@@ -48,24 +48,21 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
 
-            // Start accessing the security-scoped resource.
-            let didStart = url.startAccessingSecurityScopedResource()
-            defer {
-                if didStart {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            }
+            // Start accessing security-scoped resource and keep it alive
+            // until the caller processes the URL (don't stop in defer).
+            _ = url.startAccessingSecurityScopedResource()
 
-            // Create a local bookmark for persistent access.
+            // Create a bookmark for persistent access across app launches.
             if let bookmarkData = try? url.bookmarkData(
                 options: .minimalBookmark,
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             ) {
-                onPick(url)
-            } else {
-                onPick(url)
+                // Store bookmark for future use.
+                UserDefaults.standard.set(bookmarkData, forKey: "com.ios-agent-app.last-bookmark")
             }
+
+            onPick(url)
         }
 
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
