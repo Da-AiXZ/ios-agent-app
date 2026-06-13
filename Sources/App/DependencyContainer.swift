@@ -9,10 +9,10 @@ import SwiftUI
 /// container ensures the correct dependency chain is wired:
 ///
 /// ```
-/// Services 鈫?Core Engine (APIClient, ToolRegistry, etc.)
-///          鈫?Tools (injected into ToolRegistry)
-///          鈫?AgentRuntime (receives all Core components)
-///          鈫?ViewModels (receive concrete dependencies)
+/// Services → Core Engine (APIClient, ToolRegistry, etc.)
+///          → Tools (injected into ToolRegistry)
+///          → AgentRuntime (receives all Core components)
+///          → ViewModels (receive concrete dependencies)
 /// ```
 ///
 /// All ViewModel factory methods return fresh instances that share
@@ -68,7 +68,7 @@ final class DependencyContainer: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        // 鈹€鈹€ Phase 1: Services 鈹€鈹€
+        // ── Phase 1: Services ──
         let fsService = FileSystemService()
         let gitSvc = GitService()
         let termSvc = TerminalService()
@@ -83,7 +83,7 @@ final class DependencyContainer: ObservableObject {
         self.diffService = diffSvc
         self.searchService = searchSvc
 
-        // 鈹€鈹€ Phase 2: Core Engine 鈹€鈹€
+        // ── Phase 2: Core Engine ──
         let parser = SSEParser()
         self.sseParser = parser
 
@@ -115,7 +115,7 @@ final class DependencyContainer: ObservableObject {
         )
         self.agentRuntime = agent
 
-        // 鈹€鈹€ Phase 3: Register Tools 鈹€鈹€
+        // ── Phase 3: Register Tools ──
         registerAllTools(
             fsService: fsService,
             gitService: gitSvc,
@@ -123,7 +123,7 @@ final class DependencyContainer: ObservableObject {
             searchService: searchSvc
         )
 
-        Logger.info("DependencyContainer initialized 鈥?all services, core, and tools wired.")
+        Logger.info("DependencyContainer initialized — all services, core, and tools wired.")
     }
 
     // MARK: - Tool Registration
@@ -217,6 +217,6 @@ final class DependencyContainer: ObservableObject {
         )
         self.agentRuntime = newAgent
 
-        Logger.info("APIClient reconfigued 鈥?endpoint: \(baseURL), provider: \(provider.rawValue)")
+        Logger.info("APIClient reconfigued — endpoint: \(baseURL), provider: \(provider.rawValue)")
     }
 }
