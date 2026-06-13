@@ -273,7 +273,7 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
             ?? KeychainHelper.load(key: "com.ios-agent-app.openai-api-key")
         if let key = key {
             updated.apiKey = maskAPIKey(key)
-            appSettings.anthropicAPIKey = key
+            // NOTE: API key is NEVER written to AppSettings — only Keychain.
         }
 
         // Load system prompt from UserDefaults.
@@ -297,12 +297,11 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
     }
 
     private func handleSaveSettings() {
-        // Update domain model.
+        // Update domain model — NEVER write API keys to AppSettings.
         appSettings.theme = state.theme
         appSettings.language = state.language
         appSettings.defaultModelId = state.modelName
         appSettings.openAIBaseURL = state.apiEndpoint
-        appSettings.anthropicAPIKey = KeychainHelper.load(key: currentKeychainKey) ?? ""
         appSettings.trustedPaths = state.trustedPaths
 
         // Persist to UserDefaults.
