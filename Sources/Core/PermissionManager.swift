@@ -18,11 +18,13 @@ protocol PermissionManagerProtocol: AnyObject {
     ///   - toolName: The name of the tool requesting permission.
     ///   - description: A human-readable description of the operation.
     ///   - path: The file path affected by the operation, if applicable.
+    ///   - toolCallId: The actual tool call ID from the API response (not random).
     /// - Returns: A `PermissionDecision` indicating the outcome.
     func requestPermission(
         toolName: String,
         description: String,
-        path: String?
+        path: String?,
+        toolCallId: String?
     ) async -> PermissionDecision
 
     /// Checks whether a given path is within the trusted paths set.
@@ -40,6 +42,12 @@ protocol PermissionManagerProtocol: AnyObject {
     ///
     /// - Parameter paths: The new list of trusted directory paths.
     func setTrustedPaths(_ paths: [String])
+
+    /// Approves a pending permission request by tool call ID.
+    func approveRequest(toolCallId: String)
+
+    /// Denies a pending permission request by tool call ID.
+    func denyRequest(toolCallId: String)
 }
 
 // MARK: - PermissionManager
@@ -92,7 +100,8 @@ final class PermissionManager: ObservableObject, PermissionManagerProtocol {
     func requestPermission(
         toolName: String,
         description: String,
-        path: String?
+        path: String?,
+        toolCallId: String? = nil
     ) async -> PermissionDecision {
         // Check if read-only tool should be auto-approved.
         if autoApproveReadOnly && readOnlyTools.contains(toolName) {
@@ -112,7 +121,7 @@ final class PermissionManager: ObservableObject, PermissionManagerProtocol {
         return await withCheckedContinuation { continuation in
             let request = PermissionRequest(
                 id: UUID(),
-                toolCallId: UUID().uuidString,
+                toolCallId: toolCallId ?? UUID().uuidString,
                 toolName: toolName,
                 description: description,
                 path: path,
@@ -133,8 +142,12 @@ final class PermissionManager: ObservableObject, PermissionManagerProtocol {
     }
 
     func isPathTrusted(_ path: String) -> Bool {
+        let standardized = (path as NSString).standardizingPath
         for trustedPath in trustedPaths {
-            if path.hasPrefix(trustedPath) {
+            let standardizedTrusted = (trustedPath as NSString).standardizingPath
+            // Ensure path is within the trusted directory, not just a prefix match.
+            if standardized == standardizedTrusted
+                || standardized.hasPrefix(standardizedTrusted + "/") {
                 return true
             }
         }
@@ -147,5 +160,15 @@ final class PermissionManager: ObservableObject, PermissionManagerProtocol {
 
     func setTrustedPaths(_ paths: [String]) {
         trustedPaths = paths
+    }
+
+    func approveRequest(toolCallId: String) {
+        guard let request = pendingRequest, request.toolCallId == toolCallId else { return }
+        request.onApprove()
+    }
+
+    func denyRequest(toolCallId: String) {
+        guard let request = pendingRequest, request.toolCallId == toolCallId else { return }
+        request.onDeny()
     }
 }
