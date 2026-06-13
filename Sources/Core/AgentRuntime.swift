@@ -252,7 +252,7 @@ final class AgentRuntime: ObservableObject, AgentRuntimeProtocol {
                                 path: path,
                                 toolCallId: call.id
                             )
-                            if approval == .approved {
+                            if case .approved = approval {
                                 approvedCalls.append(call)
                                 subject.send(.toolExecuting(callId: call.id))
                             } else {
