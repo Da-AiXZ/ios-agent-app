@@ -133,9 +133,6 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
     private let permissionManager: PermissionManagerProtocol
     private var effectsSubject = PassthroughSubject<Effect, Never>()
 
-    /// Keychain key for storing the API key.
-    private let apiKeyKeychainKey: String
-
     /// UserDefaults key for storing non-sensitive settings.
     private let defaultsKey: String
 
@@ -146,15 +143,21 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
 
     init(
         permissionManager: PermissionManagerProtocol = PermissionManager(),
-        apiKeyKeychainKey: String = "com.ios-agent-app.anthropic-api-key",
         defaultsKey: String = "com.ios-agent-app.settings"
     ) {
         self.permissionManager = permissionManager
-        self.apiKeyKeychainKey = apiKeyKeychainKey
         self.defaultsKey = defaultsKey
 
         // Load persisted settings on init.
         dispatch(.loadSettings)
+    }
+
+    /// Returns the appropriate keychain key for the current API provider.
+    private var currentKeychainKey: String {
+        switch state.apiProvider {
+        case .anthropic: return "com.ios-agent-app.anthropic-api-key"
+        case .openai:    return "com.ios-agent-app.openai-api-key"
+        }
     }
 
     // MARK: - Intent Dispatch
@@ -208,7 +211,7 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
         state = updated
 
         // Persist to keychain immediately.
-        KeychainHelper.save(key: apiKeyKeychainKey, value: key)
+        KeychainHelper.save(key: currentKeychainKey, value: key)
         Logger.info("API key updated")
     }
 
@@ -265,8 +268,10 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
             updated.trustedPaths = settings.trustedPaths
         }
 
-        // Load API key from keychain (masked).
-        if let key = KeychainHelper.load(key: apiKeyKeychainKey) {
+        // Load API key from keychain (try both provider keys).
+        let key = KeychainHelper.load(key: "com.ios-agent-app.anthropic-api-key")
+            ?? KeychainHelper.load(key: "com.ios-agent-app.openai-api-key")
+        if let key = key {
             updated.apiKey = maskAPIKey(key)
             appSettings.anthropicAPIKey = key
         }
@@ -276,6 +281,10 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
 
         // Load auto-approve setting.
         updated.autoApproveReadOnly = defaults.bool(forKey: "com.ios-agent-app.auto-approve-readonly")
+
+        // Load provider setting.
+        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "anthropic"
+        updated.apiProvider = (providerRaw == "openai") ? .openai : .anthropic
 
         updated.isDirty = false
         state = updated
@@ -293,6 +302,7 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
         appSettings.language = state.language
         appSettings.defaultModelId = state.modelName
         appSettings.openAIBaseURL = state.apiEndpoint
+        appSettings.anthropicAPIKey = KeychainHelper.load(key: currentKeychainKey) ?? ""
         appSettings.trustedPaths = state.trustedPaths
 
         // Persist to UserDefaults.
@@ -300,6 +310,11 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
         if let data = try? JSONEncoder().encode(appSettings) {
             defaults.set(data, forKey: defaultsKey)
         }
+
+        // Also save endpoint to a simple key for DependencyContainer fast lookup.
+        defaults.set(state.apiEndpoint, forKey: "com.ios-agent-app.api-endpoint")
+        defaults.set(state.modelName, forKey: "com.ios-agent-app.model-id")
+        defaults.set(state.apiProvider.rawValue, forKey: "com.ios-agent-app.api-provider")
 
         // Persist system prompt.
         defaults.set(state.systemPrompt, forKey: "com.ios-agent-app.system-prompt")
@@ -317,6 +332,9 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
 
         effectsSubject.send(.savedSuccessfully)
         Logger.info("Settings saved")
+
+        // Post notification so DependencyContainer and AppRootView can rewire.
+        NotificationCenter.default.post(name: .settingsDidChange, object: nil)
     }
 
     private func handleResetToDefaults() {
