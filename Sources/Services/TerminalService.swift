@@ -88,6 +88,7 @@ enum TerminalServiceError: LocalizedError {
     case executionFailed(command: String, exitCode: Int32, stderr: String)
     case timeout(command: String)
     case invalidCommand
+    case notAvailableOnIOS
 
     var errorDescription: String? {
         switch self {
@@ -97,37 +98,16 @@ enum TerminalServiceError: LocalizedError {
             return "Command '\(cmd)' timed out."
         case .invalidCommand:
             return "Invalid or empty command."
+        case .notAvailableOnIOS:
+            return "Shell execution is not available on iOS."
         }
     }
 }
 
 // MARK: - TerminalService
 
-/// Executes shell commands using the system `Process` API.
-///
-/// Supports both batch execution (wait for complete result) and
-/// streaming execution (real-time output via `AsyncStream`).
-/// Includes timeout support and environment variable configuration.
+/// Shell execution is not available on iOS. All methods throw.
 final class TerminalService: TerminalServiceProtocol, TerminalProvider {
-
-    // MARK: - Properties
-
-    /// The currently running process, if any.
-    private var currentProcess: Process?
-
-    /// Lock for thread-safe process access.
-    private let lock = NSLock()
-
-    /// Default shell path.
-    private let shellPath: String
-
-    // MARK: - Initialization
-
-    init(shellPath: String = "/bin/zsh") {
-        self.shellPath = shellPath
-    }
-
-    // MARK: - TerminalServiceProtocol
 
     func execute(
         command: String,
@@ -135,79 +115,7 @@ final class TerminalService: TerminalServiceProtocol, TerminalProvider {
         timeout: Int?,
         environment: [String: String]?
     ) async throws -> TerminalResult {
-        guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw TerminalServiceError.invalidCommand
-        }
-
-        let startTime = Date()
-        Logger.info("Executing command: \(command.prefix(80))...")
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: shellPath)
-        process.arguments = ["-c", command]
-        process.currentDirectoryURL = cwd
-
-        if let env = environment {
-            var processEnv = ProcessInfo.processInfo.environment
-            for (key, value) in env {
-                processEnv[key] = value
-            }
-            process.environment = processEnv
-        }
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        lock.lock()
-        currentProcess = process
-        lock.unlock()
-
-        defer {
-            lock.lock()
-            currentProcess = nil
-            lock.unlock()
-        }
-
-        do {
-            try process.run()
-        } catch {
-            Logger.error("Failed to launch process: \(error.localizedDescription)")
-            throw TerminalServiceError.executionFailed(
-                command: command,
-                exitCode: -1,
-                stderr: error.localizedDescription
-            )
-        }
-
-        // Apply timeout if specified.
-        let timeoutSec = timeout ?? 120
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: UInt64(timeoutSec) * 1_000_000_000)
-            if process.isRunning {
-                process.terminate()
-            }
-        }
-
-        process.waitUntilExit()
-        timeoutTask.cancel()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-        let duration = Date().timeIntervalSince(startTime) * 1000
-
-        Logger.info("Command completed in \(String(format: "%.0f", duration))ms (exit: \(process.terminationStatus))")
-
-        return TerminalResult(
-            exitCode: process.terminationStatus,
-            stdout: stdout,
-            stderr: stderr,
-            durationMs: duration
-        )
+        throw TerminalServiceError.notAvailableOnIOS
     }
 
     func executeStreaming(
@@ -215,88 +123,11 @@ final class TerminalService: TerminalServiceProtocol, TerminalProvider {
         cwd: URL?
     ) -> AsyncThrowingStream<TerminalOutputChunk, Error> {
         AsyncThrowingStream<TerminalOutputChunk, Error> { continuation in
-            guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                continuation.finish(throwing: TerminalServiceError.invalidCommand)
-                return
-            }
-
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: shellPath)
-            process.arguments = ["-c", command]
-            process.currentDirectoryURL = cwd
-
-            let stdoutPipe = Pipe()
-            let stderrPipe = Pipe()
-            process.standardOutput = stdoutPipe
-            process.standardError = stderrPipe
-
-            lock.lock()
-            currentProcess = process
-            lock.unlock()
-
-            // Set up async reading.
-            stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else { return }
-                if let text = String(data: data, encoding: .utf8) {
-                    continuation.yield(TerminalOutputChunk(type: .stdout, text: text))
-                }
-            }
-
-            stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else { return }
-                if let text = String(data: data, encoding: .utf8) {
-                    continuation.yield(TerminalOutputChunk(type: .stderr, text: text))
-                }
-            }
-
-            process.terminationHandler = { [weak self] proc in
-                // Close pipes.
-                stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                stderrPipe.fileHandleForReading.readabilityHandler = nil
-
-                // Read remaining data.
-                let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                if let text = String(data: remainingStdout, encoding: .utf8), !text.isEmpty {
-                    continuation.yield(TerminalOutputChunk(type: .stdout, text: text))
-                }
-
-                self?.lock.lock()
-                self?.currentProcess = nil
-                self?.lock.unlock()
-
-                if proc.terminationStatus != 0 {
-                    continuation.finish(
-                        throwing: TerminalServiceError.executionFailed(
-                            command: command,
-                            exitCode: proc.terminationStatus,
-                            stderr: ""
-                        )
-                    )
-                } else {
-                    continuation.finish()
-                }
-            }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.finish(throwing: error)
-            }
+            continuation.finish(throwing: TerminalServiceError.notAvailableOnIOS)
         }
     }
 
-    func terminate() {
-        lock.lock()
-        defer { lock.unlock() }
-        currentProcess?.terminate()
-    }
+    func terminate() {}
 
-    /// Whether a process is currently running.
-    var isRunning: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return currentProcess?.isRunning ?? false
-    }
+    var isRunning: Bool { false }
 }
