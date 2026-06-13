@@ -12,23 +12,9 @@ let package = Package(
             targets: ["ios-agent-app"]
         ),
     ],
-    dependencies: [
-        .package(
-            url: "https://github.com/ChimeHQ/Neon.git",
-            .upToNextMinor(from: "0.5.0")
-        ),
-        .package(
-            url: "https://github.com/apple/swift-markdown.git",
-            .upToNextMinor(from: "0.3.0")
-        ),
-    ],
     targets: [
         .target(
             name: "ios-agent-app",
-            dependencies: [
-                .product(name: "Neon", package: "Neon"),
-                .product(name: "Markdown", package: "swift-markdown"),
-            ],
             path: "Sources",
             exclude: []
         ),
