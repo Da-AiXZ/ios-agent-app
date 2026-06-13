@@ -265,16 +265,16 @@ struct SettingsView: View {
 
     private func themeName(_ theme: AppTheme) -> String {
         switch theme {
-        case .light: return "鈽€锔?Light"
-        case .dark: return "馃寵 Dark"
-        case .system: return "鈿欙笍 System"
+        case .light: return "☀️ Light"
+        case .dark: return "🌙 Dark"
+        case .system: return "⚙️ System"
         }
     }
 
     private func languageName(_ lang: AppLanguage) -> String {
         switch lang {
         case .english: return "English"
-        case .chinese: return "涓枃"
+        case .chinese: return "中文"
         }
     }
 
