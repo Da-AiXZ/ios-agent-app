@@ -15,7 +15,7 @@ struct DiffView: View {
     var originalContent: String?
 
     /// Called when the user accepts a specific edit.
-    var onAccept: ((oldString: String, newString: String) -> Void)?
+    var onAccept: ((String, String) -> Void)?
 
     /// Called when the user rejects/discards changes.
     var onReject: (() -> Void)?
@@ -46,7 +46,7 @@ struct DiffView: View {
                 Button(action: {
                     // Accept all: no individual old/new strings, so just call onReject differently.
                     // For simplicity, we callback with empty strings for "accept all".
-                    onAccept?(("", ""))
+                    onAccept?("", "")
                 }) {
                     Label("Accept All", systemImage: "checkmark.circle")
                         .font(.caption)
@@ -232,7 +232,7 @@ enum DiffDisplayMode: String, CaseIterable {
                 newStartLine: 3
             ),
         ],
-        onAccept: { _ in },
+        onAccept: { _, _ in },
         onReject: {}
     )
 }
