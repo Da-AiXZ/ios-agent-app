@@ -93,8 +93,8 @@ final class DependencyContainer: ObservableObject {
         let defaults = UserDefaults.standard
         let baseURL = defaults.string(forKey: "com.ios-agent-app.api-endpoint")
             ?? AppConstants.defaultAnthropicAPIEndpoint
-        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "anthropic"
-        let provider: APIProvider = (providerRaw == "openai") ? .openai : .anthropic
+        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "openai"
+        let provider: APIProvider = (providerRaw == "anthropic") ? .anthropic : .openai
         let apiClient = APIClient(apiKey: apiKey, baseURL: baseURL, provider: provider)
         self.apiClient = apiClient
 
@@ -204,7 +204,7 @@ final class DependencyContainer: ObservableObject {
         let modelId = defaults.string(forKey: "com.ios-agent-app.model-id")
             ?? AppConstants.defaultModelId
         let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? ""
-        let provider: APIProvider = (providerRaw == "openai") ? .openai : .anthropic
+        let provider: APIProvider = (providerRaw == "anthropic") ? .anthropic : .openai
 
         let newClient = APIClient(apiKey: apiKey, baseURL: baseURL, provider: provider)
         self.apiClient = newClient
