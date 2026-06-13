@@ -242,8 +242,40 @@ final class AgentRuntime: ObservableObject, AgentRuntimeProtocol {
                                 return (id: tc.id, name: tc.name, arguments: args)
                             }
 
+                        // Check permissions before executing tools.
+                        var approvedCalls: [(id: String, name: String, arguments: [String: Any])] = []
+                        for call in toolCallsToExecute {
+                            let path = call.arguments["path"] as? String
+                            let approval = await self.permissionManager.requestPermission(
+                                toolName: call.name,
+                                description: "Execute \(call.name)",
+                                path: path,
+                                toolCallId: call.id
+                            )
+                            if approval == .approved {
+                                approvedCalls.append(call)
+                                subject.send(.toolExecuting(callId: call.id))
+                            } else {
+                                let denied = ToolResult(
+                                    toolCallId: call.id,
+                                    toolName: call.name,
+                                    status: .error,
+                                    output: "",
+                                    errorMessage: "User denied permission",
+                                    durationMs: 0
+                                )
+                                subject.send(.toolCompleted(result: denied))
+                            }
+                        }
+
+                        guard !approvedCalls.isEmpty else {
+                            subject.send(.toolRoundCompleted(results: []))
+                            toolRound += 1
+                            continue
+                        }
+
                         let results = await self.toolRegistry.executeToolsParallel(
-                            calls: toolCallsToExecute
+                            calls: approvedCalls
                         )
 
                         // Notify about each result.
@@ -275,9 +307,7 @@ final class AgentRuntime: ObservableObject, AgentRuntimeProtocol {
                     // No tool calls: final response received.
                     let finalAssistantMsg = Message(
                         role: .assistant,
-                        content: accumulatedContent.isEmpty
-                            ? currentAssistantContent
-                            : accumulatedContent + currentAssistantContent,
+                        content: accumulatedContent,
                         timestamp: Date()
                     )
                     self.conversationManager.appendMessage(
