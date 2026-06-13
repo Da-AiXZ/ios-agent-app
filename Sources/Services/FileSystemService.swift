@@ -73,7 +73,6 @@ enum FileSystemError: LocalizedError {
     case notADirectory(path: String)
     case isADirectory(path: String)
     case directoryNotEmpty(path: String)
-    case outsideSandbox(path: String, root: String)
 
     var errorDescription: String? {
         switch self {
@@ -93,8 +92,6 @@ enum FileSystemError: LocalizedError {
             return "Is a directory: \(path)"
         case .directoryNotEmpty(let path):
             return "Directory not empty: \(path)"
-        case .outsideSandbox(let path, let root):
-            return "Path outside project sandbox: \(path) is not under \(root)"
         }
     }
 }
@@ -113,35 +110,15 @@ final class FileSystemService: FileSystemServiceProtocol {
     /// The underlying file manager.
     private let fileManager: FileManager
 
-    /// Optional sandbox: all file operations are validated to stay within
-    /// this root directory. Set to `nil` for unrestricted access.
-    private let projectRoot: URL?
-
     // MARK: - Initialization
 
-    init(fileManager: FileManager = .default, projectRoot: URL? = nil) {
+    init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
-        self.projectRoot = projectRoot
-    }
-
-    // MARK: - Sandbox Validation
-
-    /// Validates that the given URL is within the project root sandbox.
-    private func validateSandbox(_ url: URL) throws {
-        guard let root = projectRoot else { return }
-        let resolvedPath = url.resolvingSymlinksInPath().standardized.path
-        let rootPath = root.resolvingSymlinksInPath().standardized.path
-        // Must match root exactly or be under root/ (boundary check).
-        if resolvedPath != rootPath && !resolvedPath.hasPrefix(rootPath + "/") {
-            Logger.error("Sandbox violation: \(url.path) outside \(root.path)")
-            throw FileSystemError.outsideSandbox(path: url.path, root: root.path)
-        }
     }
 
     // MARK: - FileSystemServiceProtocol
 
     func readFile(at url: URL) throws -> String {
-        try validateSandbox(url)
         guard fileManager.fileExists(atPath: url.path) else {
             Logger.fileSystemInfo("File not found: \(url.path)")
             throw FileSystemError.fileNotFound(path: url.path)
@@ -173,7 +150,6 @@ final class FileSystemService: FileSystemServiceProtocol {
     }
 
     func writeFile(content: String, at url: URL) throws {
-        try validateSandbox(url)
         // Ensure parent directory exists.
         let parentDir = url.deletingLastPathComponent()
         if !fileManager.fileExists(atPath: parentDir.path) {
