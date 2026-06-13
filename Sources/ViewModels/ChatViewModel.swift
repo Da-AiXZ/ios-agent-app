@@ -86,6 +86,9 @@ enum ChatIntent: ViewIntent {
 
     /// Update the text in the input field.
     case updateInputText(String)
+
+    /// Refresh the conversation list from the manager.
+    case refreshConversations
 }
 
 // MARK: - ChatEffect
@@ -133,7 +136,7 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
 
     // MARK: - Private Properties
 
-    private let agentRuntime: AgentRuntimeProtocol
+    private var agentRuntime: AgentRuntimeProtocol
     private let conversationManager: ConversationManager
     private let permissionManager: PermissionManagerProtocol
 
@@ -153,6 +156,15 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
 
         // Subscribe to permission manager pending requests.
         observePermissionRequests()
+    }
+
+    // MARK: - Dynamic Reconfiguration
+
+    /// Updates the agent runtime with a new instance (e.g., after
+    /// settings save with new API credentials).
+    func reconfigureAgentRuntime(_ newRuntime: AgentRuntimeProtocol) {
+        self.agentRuntime = newRuntime
+        Logger.info("ChatViewModel AgentRuntime reconfigured")
     }
 
     // MARK: - Intent Dispatch
@@ -177,6 +189,8 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
             var updated = state
             updated.inputText = text
             state = updated
+        case .refreshConversations:
+            conversationManager.load()
         }
     }
 
@@ -233,8 +247,13 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
     }
 
     /// Retries the last agent interaction by resending the most recent
-    /// user message.
+    /// user message after stopping any in-progress generation.
     private func handleRetry() {
+        // Stop any current generation first.
+        if state.isStreaming {
+            agentRuntime.cancel()
+        }
+
         guard let lastUserMessage = state.messages.last(where: { $0.role == .user }) else {
             return
         }
@@ -243,6 +262,10 @@ final class ChatViewModel: MVIViewModel, ObservableObject {
         while let last = updated.messages.last, last.role != .user {
             updated.messages.removeLast()
         }
+        updated.isStreaming = false
+        updated.streamingText = ""
+        updated.agentStatus = .idle
+        updated.error = nil
         state = updated
         handleSendMessage(lastUserMessage.content)
     }
