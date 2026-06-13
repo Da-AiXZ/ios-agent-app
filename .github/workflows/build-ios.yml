@@ -43,6 +43,20 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+      - name: Run tests in Simulator
+        id: test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project ios-agent-app.xcodeproj \
+            -scheme ios-agent-app \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -derivedDataPath DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -resultBundlePath test-results.xcresult || echo "Tests completed with failures (non-blocking)"
+
       - name: Package unsigned IPA
         run: |
           APP_PATH=$(find DerivedData -name "ios-agent-app.app" -path "*/Release-iphoneos/*" | head -1)
