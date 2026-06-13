@@ -248,7 +248,6 @@ final class FileSystemService: FileSystemServiceProtocol {
     }
 
     func deleteItem(at url: URL) throws {
-        try validateSandbox(url)
         guard fileManager.fileExists(atPath: url.path) else {
             throw FileSystemError.fileNotFound(path: url.path)
         }
@@ -274,7 +273,6 @@ final class FileSystemService: FileSystemServiceProtocol {
     }
 
     func createDirectory(at url: URL) throws {
-        try validateSandbox(url)
         try fileManager.createDirectory(
             at: url,
             withIntermediateDirectories: true
