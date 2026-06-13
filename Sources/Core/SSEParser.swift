@@ -99,7 +99,7 @@ final class SSEParser {
     private var consecutiveDecodeFailures: Int
 
     /// Continuation for the AsyncStream output.
-    private var continuation: AsyncStream<SSEEvent>.Continuation?
+    private var continuation: AsyncThrowingStream<SSEEvent, Error>.Continuation?
 
     // MARK: - Initialization
 
@@ -124,8 +124,8 @@ final class SSEParser {
     /// - Parameter bytes: The raw data chunk received from the network.
     /// - Returns: An `AsyncStream` that yields `SSEEvent` values as
     ///   they are parsed.
-    func feed(bytes: Data) -> AsyncStream<SSEEvent> {
-        AsyncStream<SSEEvent> { continuation in
+    func feed(bytes: Data) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream<SSEEvent, Error> { continuation in
             self.continuation = continuation
             buffer.append(bytes)
             parseBuffer()
@@ -141,7 +141,7 @@ final class SSEParser {
     /// the provided continuation.
     ///
     /// - Parameter continuation: The stream continuation to yield events into.
-    func parseStream(continuation: AsyncStream<SSEEvent>.Continuation) {
+    func parseStream(continuation: AsyncThrowingStream<SSEEvent, Error>.Continuation) {
         self.continuation = continuation
     }
 
