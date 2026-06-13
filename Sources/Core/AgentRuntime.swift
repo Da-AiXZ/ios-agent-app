@@ -142,9 +142,6 @@ final class AgentRuntime: ObservableObject, AgentRuntimeProtocol {
             )
             messages.append(userMessage)
 
-            // Append the user message to the persistent conversation.
-            self.conversationManager.appendMessage(conversation.id, message: userMessage)
-
             // Send initial thinking event.
             subject.send(.thinking)
 
