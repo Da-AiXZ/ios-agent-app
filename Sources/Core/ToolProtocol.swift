@@ -91,4 +91,12 @@ protocol ToolRegistryProtocol: AnyObject {
         name: String,
         arguments: [String: Any]
     ) async throws -> ToolResult
+
+    /// Executes multiple tools in parallel.
+    ///
+    /// - Parameter calls: Array of (id, name, arguments) tuples.
+    /// - Returns: Array of results in the same order as calls.
+    func executeToolsParallel(
+        calls: [(id: String, name: String, arguments: [String: Any])]
+    ) async -> [ToolResult]
 }
