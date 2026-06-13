@@ -18,10 +18,10 @@ enum AppConstants {
     // MARK: - Model Configuration
 
     /// The default model identifier used for agent conversations.
-    static let defaultModelId: String = "claude-sonnet-4-20250514"
+    static let defaultModelId: String = "claude-3-5-sonnet-20241022"
 
     /// The fallback model identifier when the default is unavailable.
-    static let fallbackModelId: String = "claude-sonnet-3-5-20241022"
+    static let fallbackModelId: String = "claude-3-haiku-20240307"
 
     // MARK: - Version
 
