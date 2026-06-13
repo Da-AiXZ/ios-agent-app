@@ -9,10 +9,10 @@ import SwiftUI
 /// container ensures the correct dependency chain is wired:
 ///
 /// ```
-/// Services → Core Engine (APIClient, ToolRegistry, etc.)
-///          → Tools (injected into ToolRegistry)
-///          → AgentRuntime (receives all Core components)
-///          → ViewModels (receive concrete dependencies)
+/// Services 鈫?Core Engine (APIClient, ToolRegistry, etc.)
+///          鈫?Tools (injected into ToolRegistry)
+///          鈫?AgentRuntime (receives all Core components)
+///          鈫?ViewModels (receive concrete dependencies)
 /// ```
 ///
 /// All ViewModel factory methods return fresh instances that share
@@ -51,7 +51,7 @@ final class DependencyContainer: ObservableObject {
     let sseParser: SSEParser
 
     /// HTTP SSE API client.
-    let apiClient: APIClientProtocol
+    private(set) var apiClient: APIClientProtocol
 
     /// Tool registration and execution registry.
     let toolRegistry: ToolRegistry
@@ -63,12 +63,12 @@ final class DependencyContainer: ObservableObject {
     let conversationManager: ConversationManager
 
     /// Core agent execution loop.
-    let agentRuntime: AgentRuntimeProtocol
+    private(set) var agentRuntime: AgentRuntimeProtocol
 
     // MARK: - Initialization
 
     init() {
-        // ── Phase 1: Services ──
+        // 鈹€鈹€ Phase 1: Services 鈹€鈹€
         let fsService = FileSystemService()
         let gitSvc = GitService()
         let termSvc = TerminalService()
@@ -83,14 +83,19 @@ final class DependencyContainer: ObservableObject {
         self.diffService = diffSvc
         self.searchService = searchSvc
 
-        // ── Phase 2: Core Engine ──
+        // 鈹€鈹€ Phase 2: Core Engine 鈹€鈹€
         let parser = SSEParser()
         self.sseParser = parser
 
-        let apiKey = KeychainHelper.load(key: "com.ios-agent-app.anthropic-api-key") ?? ""
-        let baseURL = UserDefaults.standard.string(forKey: "com.ios-agent-app.api-endpoint")
+        let apiKey = KeychainHelper.load(key: "com.ios-agent-app.anthropic-api-key")
+            ?? KeychainHelper.load(key: "com.ios-agent-app.openai-api-key")
+            ?? ""
+        let defaults = UserDefaults.standard
+        let baseURL = defaults.string(forKey: "com.ios-agent-app.api-endpoint")
             ?? AppConstants.defaultAnthropicAPIEndpoint
-        let apiClient = APIClient(apiKey: apiKey, baseURL: baseURL)
+        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "anthropic"
+        let provider: APIProvider = (providerRaw == "openai") ? .openai : .anthropic
+        let apiClient = APIClient(apiKey: apiKey, baseURL: baseURL, provider: provider)
         self.apiClient = apiClient
 
         let toolReg = ToolRegistry()
@@ -110,7 +115,7 @@ final class DependencyContainer: ObservableObject {
         )
         self.agentRuntime = agent
 
-        // ── Phase 3: Register Tools ──
+        // 鈹€鈹€ Phase 3: Register Tools 鈹€鈹€
         registerAllTools(
             fsService: fsService,
             gitService: gitSvc,
@@ -118,7 +123,7 @@ final class DependencyContainer: ObservableObject {
             searchService: searchSvc
         )
 
-        Logger.info("DependencyContainer initialized — all services, core, and tools wired.")
+        Logger.info("DependencyContainer initialized 鈥?all services, core, and tools wired.")
     }
 
     // MARK: - Tool Registration
@@ -179,5 +184,39 @@ final class DependencyContainer: ObservableObject {
             syntaxService: syntaxHighlightService,
             diffService: diffService
         )
+    }
+
+    // MARK: - Dynamic Reconfiguration
+
+    /// Reads the latest API key, endpoint, model, and provider from
+    /// UserDefaults / Keychain and recreates the APIClient and
+    /// AgentRuntime with the updated credentials.
+    ///
+    /// Call this after SettingsViewModel saves new settings so that
+    /// subsequent requests use the correct authentication.
+    func reconfigureAPIClient() {
+        let apiKey = KeychainHelper.load(key: "com.ios-agent-app.anthropic-api-key")
+            ?? KeychainHelper.load(key: "com.ios-agent-app.openai-api-key")
+            ?? ""
+        let defaults = UserDefaults.standard
+        let baseURL = defaults.string(forKey: "com.ios-agent-app.api-endpoint")
+            ?? AppConstants.defaultAnthropicAPIEndpoint
+        let modelId = defaults.string(forKey: "com.ios-agent-app.model-id")
+            ?? AppConstants.defaultModelId
+        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? ""
+        let provider: APIProvider = (providerRaw == "openai") ? .openai : .anthropic
+
+        let newClient = APIClient(apiKey: apiKey, baseURL: baseURL, provider: provider)
+        self.apiClient = newClient
+
+        let newAgent = AgentRuntime(
+            apiClient: newClient,
+            toolRegistry: toolRegistry,
+            permissionManager: permissionManager,
+            conversationManager: conversationManager
+        )
+        self.agentRuntime = newAgent
+
+        Logger.info("APIClient reconfigued 鈥?endpoint: \(baseURL), provider: \(provider.rawValue)")
     }
 }
