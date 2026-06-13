@@ -34,8 +34,8 @@ struct SettingsState: ViewState {
     /// Whether the settings have unsaved changes.
     var isDirty: Bool = false
 
-    /// The API provider type.
-    var apiProvider: APIProvider = .anthropic
+    /// The API provider type. Defaults to OpenAI format (most widely supported).
+    var apiProvider: APIProvider = .openai
 
     /// Whether the API key is being edited (unmasked).
     var isEditingAPIKey: Bool = false
@@ -282,9 +282,9 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
         // Load auto-approve setting.
         updated.autoApproveReadOnly = defaults.bool(forKey: "com.ios-agent-app.auto-approve-readonly")
 
-        // Load provider setting.
-        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "anthropic"
-        updated.apiProvider = (providerRaw == "openai") ? .openai : .anthropic
+        // Load provider setting — default to OpenAI format (industry standard).
+        let providerRaw = defaults.string(forKey: "com.ios-agent-app.api-provider") ?? "openai"
+        updated.apiProvider = (providerRaw == "anthropic") ? .anthropic : .openai
 
         updated.isDirty = false
         state = updated
@@ -342,7 +342,7 @@ final class SettingsViewModel: MVIViewModel, ObservableObject {
         updated.language = .english
         updated.modelName = AppConstants.defaultModelId
         updated.apiEndpoint = AppConstants.defaultAnthropicAPIEndpoint
-        updated.apiProvider = .anthropic
+        updated.apiProvider = .openai
         updated.autoApproveReadOnly = false
         updated.trustedPaths = []
         updated.systemPrompt = ""
